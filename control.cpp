@@ -141,7 +141,6 @@ int main() {
     auto boton1 = new Boton("Luz Amarilla", luz, &luz.toggle);
     
     c.botones.push_back(new Boton("Luz Amarilla", &a::luces["Yellow"]::toggle() );
-    
 }
 
 
