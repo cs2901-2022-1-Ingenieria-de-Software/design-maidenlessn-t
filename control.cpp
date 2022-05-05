@@ -8,6 +8,10 @@
 using namespace std;
 int  MAX = 100;
 
+// on and off states
+enum State { off = 0, on = 1 }; 
+
+///////////////// old implementation /////////////////////
 struct Luz {
     int color;
     int intensidad;
@@ -45,7 +49,6 @@ struct Luz {
         }
     }
 };
-
 
 struct Ventilador {
     int velocidad;
@@ -130,6 +133,129 @@ public:
     }
 };
 
+//////////////////////////////////////////////////////////
+
+
+///////////////// new implementation /////////////////////
+
+//- COMMAND PATTERN -//
+
+// Receivers:
+// class Light (parent: Device)
+// class Fan (parent: Device)
+class Device{
+private:
+    State currentState = off;
+public:
+    State toggle(){
+        if (currentState == off)
+            currentState = on;
+        else
+            currentState = off;
+        return currentState;
+    }
+    State getCurrentState(){
+        return currentState;
+    }
+};
+
+class Light : public Device{
+private:
+    string color;
+public:
+    Light(string _color): color{_color}{};
+};
+
+class Fan : public Device{
+private:
+    int maxSpeed;
+    int minSpeed;
+    int currentSpeed;
+
+public:
+    Fan(){ minSpeed = 0; maxSpeed = 100; currentSpeed = 0;};
+    Fan(int _minSpeed, int _maxSpeed): minSpeed{_minSpeed}, maxSpeed{_maxSpeed}{};
+
+    int getCurrentSpeed(){
+        return currentSpeed;
+    }
+
+    bool increaseSpeed(int amount){
+        if ((currentSpeed + amount) < maxSpeed)
+            currentSpeed += amount;
+        else
+            currentSpeed = maxSpeed;
+
+        if (getCurrentState() == off){
+            toggle();
+        }
+        return 1;
+    }
+
+    bool decreaseSpeed(int amount){
+        if ((currentSpeed - amount) > minSpeed)
+            currentSpeed -= amount;
+        else
+            currentSpeed = minSpeed;
+
+        if (currentSpeed == minSpeed && getCurrentState() == on){
+            toggle();
+        }
+        return 1;
+    }
+};
+
+// Command parent class
+class Command{
+public:
+    virtual bool execute() const = 0;
+};
+
+// Command implementations
+class toggleCommand : public Command{
+protected:
+    Device* d;
+public:
+    toggleCommand(Device* _d){ d = _d;};
+
+    bool execute() const override{
+        d->toggle();
+        return true;
+    }
+};
+
+class increaseCommand : public Command{
+protected:
+    Fan* d;
+    int amount;
+public:
+    increaseCommand(Fan* _d, int _amount){ d = _d; amount = _amount;};
+    
+    bool execute() const override{
+        d->increaseSpeed(amount);
+        return true;
+    }
+};
+
+class decreaseCommand : public Command{
+protected:
+    Fan* d;
+    int amount;
+public:
+    decreaseCommand(Fan* _d, int _amount){ d = _d; amount = _amount;};
+    
+    bool execute() const override{
+        d->decreaseSpeed(amount);
+        return true;
+    }
+};
+
+void executeCommand(Command *c) {
+    c->execute();
+}
+
+// TODO: new main, new Button (Role of Invoker, kind of what executecommand does rn), New Ambient (role of Application/Client)
+
 int main() {
     auto a = Ambiente();
     auto c = Control();
@@ -142,6 +268,8 @@ int main() {
     
     c.botones.push_back(new Boton("Luz Amarilla", &a::luces["Yellow"]::toggle() );
 }
+
+
 
 
 
