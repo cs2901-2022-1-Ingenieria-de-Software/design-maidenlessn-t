@@ -4,14 +4,16 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <list>
 
 using namespace std;
-int  MAX = 100;
 
 // on and off states
 enum State { off = 0, on = 1 }; 
 
 ///////////////// old implementation /////////////////////
+/*
+//int  MAX = 100;
 struct Luz {
     int color;
     int intensidad;
@@ -132,7 +134,7 @@ public:
         }
     }
 };
-
+*/
 //////////////////////////////////////////////////////////
 
 
@@ -144,7 +146,8 @@ public:
 // class Light (parent: Device)
 // class Fan (parent: Device)
 class Device{
-private:
+protected:
+    int id;
     State currentState = off;
 public:
     State toggle(){
@@ -157,13 +160,19 @@ public:
     State getCurrentState(){
         return currentState;
     }
+    void printCurrentState(){
+        printf("Device State: %s\n", (getCurrentState()) ? "on" : "off" );
+    }
+    int getId(){
+        return id;
+    }
 };
 
 class Light : public Device{
 private:
     string color;
 public:
-    Light(string _color): color{_color}{};
+    Light(int _id, string _color): color{_color}{id = _id;};
 };
 
 class Fan : public Device{
@@ -173,8 +182,12 @@ private:
     int currentSpeed;
 
 public:
-    Fan(){ minSpeed = 0; maxSpeed = 100; currentSpeed = 0;};
-    Fan(int _minSpeed, int _maxSpeed): minSpeed{_minSpeed}, maxSpeed{_maxSpeed}{};
+    Fan(int _id){id = _id; minSpeed = 0; maxSpeed = 100; currentSpeed = 0;};
+    Fan(int _id, int _minSpeed, int _maxSpeed): minSpeed{_minSpeed}, maxSpeed{_maxSpeed}{id = _id;};
+
+    void printCurrentSpeed(){
+        printf("Device Speed: %d%\n", currentSpeed);
+    }
 
     int getCurrentSpeed(){
         return currentSpeed;
@@ -250,12 +263,178 @@ public:
     }
 };
 
-void executeCommand(Command *c) {
-    c->execute();
+// Invoker
+class Button{
+private:
+    Command* onPress;
+public:
+    Button(Command* _action){
+        onPress = _action;
+    }
+    bool press(){
+        return onPress->execute();
+    }
+};
+
+// Stores and creates buttons
+class Remote{ // should use a ID to identify each button instead of label 
+protected:
+    map<string, Button*> Layout;
+    list<string> Labels;
+public:
+    string addButton(string label, Button* _button){
+        Layout.insert(make_pair(label, _button));
+        Labels.push_back(label);
+        return label;
+    }
+    list<string> getLabels(){
+        return Labels;
+    }
+
+    Button* getButton(string label){
+        return Layout[label]; // if not exist, exception and handle.
+    }
+};
+
+
+// AMBIENT MUST BECOME A SINGLETON
+// Application / Client
+class Ambient{
+    Remote ambientRemote;
+    map<int, Device*> deviceMap;
+    int nextID = 0;
+public:
+    Ambient(){};
+
+    Command* newToggleCommand(Device* device){
+        return new toggleCommand(device);
+    }
+
+    Command* newIncreaseCommand(Fan* fan, int amount){
+        return new increaseCommand(fan, amount);
+    }
+
+    Command* newDecreaseCommand(Fan* fan, int amount){
+        return new decreaseCommand(fan, amount);
+    }
+
+    string createButton(string name, Command* command){
+        return ambientRemote.addButton(name, new Button(command));
+    }
+    
+    int createLight(string color){
+        int currentID = nextID++;
+        Light* light = new Light(currentID, color);
+        deviceMap.insert(make_pair(currentID, light));
+        return currentID;
+    }
+
+    int createFan(){
+        int currentID = nextID++;
+        Fan* fan = new Fan(currentID);
+        deviceMap.insert(make_pair(currentID, fan));
+        return currentID;
+    }
+
+    int createFan(int minSpeed, int maxSpeed){
+        int currentID = nextID++;
+        Fan* fan = new Fan(currentID, minSpeed, maxSpeed);
+        deviceMap.insert(make_pair(currentID, fan));
+        return currentID;
+    }
+
+    Device* getDevice(int ID){
+        return deviceMap[ID]; // if not exist, exception and handle.
+    }
+
+    Light* getLightDevice(int ID){
+        return (Light*)deviceMap[ID]; // if not exist, exception and handle.
+    }
+    Fan* getFanDevice(int ID){
+        return (Fan*)deviceMap[ID]; // if not exist, exception and handle.
+    }
+    
+    Button* getButton(string label){
+        return ambientRemote.getButton(label); // if not exist, exception and handle.
+    }
+};
+
+int main(){
+    auto a = Ambient();
+    auto light1ID = a.createLight("Blue");
+    auto light2ID = a.createLight("Red");
+    auto fan1ID = a.createFan();
+
+    auto Button1ID = a.createButton("Blue Fan Toggle",  a.newToggleCommand(a.getDevice(light1ID)));
+    auto Button2ID = a.createButton("Red Fan Toggle",   a.newToggleCommand(a.getDevice(light2ID)));
+    auto Button3ID = a.createButton("Green Fan Toggle", a.newToggleCommand(a.getDevice(a.createLight("Blue"))));
+
+    auto Button4ID = a.createButton("Fan 1 Increase Speed by 10%", a.newIncreaseCommand(a.getFanDevice(fan1ID), 10));
+    auto Button5ID = a.createButton("Fan 1 Decrease Speed by 10%", a.newDecreaseCommand(a.getFanDevice(fan1ID), 10));
+
+    // Simple test
+  
+    printf("\n turning blue light on and off\n");
+    a.getDevice(light1ID)->printCurrentState();
+    printf("\n");
+
+    a.getButton(Button1ID)->press();
+    
+    a.getDevice(light1ID)->printCurrentState();
+    printf("\n");
+    
+    a.getButton(Button1ID)->press();
+    
+    a.getDevice(light1ID)->printCurrentState();
+    printf("\n");
+    
+    printf("\n increasing fan speed\n");
+    a.getFanDevice(fan1ID)->printCurrentState(); 
+    a.getFanDevice(fan1ID)->printCurrentSpeed();
+    printf("\n");
+
+    a.getButton(Button4ID)->press();
+
+    a.getFanDevice(fan1ID)->printCurrentState(); 
+    a.getFanDevice(fan1ID)->printCurrentSpeed();
+    printf("\n");
+    
+    a.getButton(Button4ID)->press();
+    
+    a.getFanDevice(fan1ID)->printCurrentState(); 
+    a.getFanDevice(fan1ID)->printCurrentSpeed();
+    printf("\n");
+
+    for (auto i = 0; i <= 10; ++i )
+        a.getButton(Button4ID)->press();
+
+    a.getFanDevice(fan1ID)->printCurrentState(); 
+    a.getFanDevice(fan1ID)->printCurrentSpeed();
+    printf("\n");
+    
+    printf("\n decreasing fan speed\n");
+    a.getButton(Button5ID)->press();
+
+    a.getFanDevice(fan1ID)->printCurrentState(); 
+    a.getFanDevice(fan1ID)->printCurrentSpeed();
+    printf("\n");
+
+    a.getButton(Button5ID)->press();
+
+    a.getFanDevice(fan1ID)->printCurrentState(); 
+    a.getFanDevice(fan1ID)->printCurrentSpeed();
+    printf("\n");
+    
+    for (auto i = 0; i <= 10; ++i )
+        a.getButton(Button5ID)->press();
+
+    a.getFanDevice(fan1ID)->printCurrentState(); 
+    a.getFanDevice(fan1ID)->printCurrentSpeed();
+    printf("\n");
 }
 
-// TODO: new main, new Button (Role of Invoker, kind of what executecommand does rn), New Ambient (role of Application/Client)
-
+// TODO: Ambient should become a singleton
+/*
 int main() {
     auto a = Ambiente();
     auto c = Control();
@@ -268,7 +447,7 @@ int main() {
     
     c.botones.push_back(new Boton("Luz Amarilla", &a::luces["Yellow"]::toggle() );
 }
-
+*/
 
 
 
