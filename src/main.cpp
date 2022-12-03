@@ -169,8 +169,6 @@ public:
     }
 };
 
-
-// AMBIENT MUST BECOME A SINGLETON
 // Application / Client
 class Ambient{
     Remote ambientRemote;
@@ -305,23 +303,3 @@ int main(){
     a.getFanDevice(fan1ID)->printCurrentSpeed();
     printf("\n");
 }
-
-// TODO: Ambient should become a singleton
-/*
-int main() {
-    auto a = Ambiente();
-    auto c = Control();
-    
-    a.insertar_luz("Yellow");
-    cout << a.luces["Yellow"].intensidad << endl;
-
-    auto luz = Luz();
-    auto boton1 = new Boton("Luz Amarilla", luz, &luz.toggle);
-    
-    c.botones.push_back(new Boton("Luz Amarilla", &a::luces["Yellow"]::toggle() );
-}
-*/
-
-
-
-
